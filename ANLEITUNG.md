@@ -5,36 +5,51 @@ Alle Inhalte bleiben auf dem jeweiligen Gerät. Kein Konto, kein Server, keine C
 
 ---
 
-## Auf dem MacBook starten
+## Die Adresse
 
-Doppelklick auf **`Start.command`** (in diesem Ordner).
+```
+https://normcodecompany.github.io/jura-kartei/
+```
 
-Es öffnet sich ein Terminal-Fenster und danach die App im Browser unter
-`http://localhost:7345/`.
-
-* Das Terminal-Fenster muss **offen bleiben**, solange du die App benutzt.
-  Schließen = App beenden. Die Daten sind dann trotzdem gespeichert.
-* Beim allerersten Mal fragt macOS eventuell nach. Falls der Doppelklick nichts tut:
-  Rechtsklick auf `Start.command` → **Öffnen** → **Öffnen** bestätigen.
-
-### Als eigenes Fenster (ohne Browser-Leiste)
-
-In Chrome: oben rechts **⋮** → *Streamen, Speichern und Teilen* → **Verknüpfung erstellen**
-→ Haken bei *Als Fenster öffnen*. Danach liegt die Jura-Kartei als eigene App im Dock.
-Der `Start.command` muss trotzdem vorher laufen.
+Diese eine Adresse benutzt du auf **beiden** Geräten. Dort liegt nur das Programm –
+deine Karten bleiben immer auf dem Gerät, auf dem du sie geschrieben hast.
 
 ---
 
-## Auf dem iPhone
+## Auf dem iPhone einrichten
 
-Dafür braucht die App eine Internetadresse (https). Siehe Abschnitt
-„iPhone einrichten" – der Weg wird separat festgelegt.
+1. **Safari** öffnen (nicht Chrome – nur Safari kann Apps anlegen)
+2. Adresse oben eingeben
+3. Unten auf das **Teilen-Symbol** (Quadrat mit Pfeil nach oben)
+4. Nach unten wischen → **Zum Home-Bildschirm** → **Hinzufügen**
 
-Sobald die Adresse steht:
-Safari öffnen → Adresse eingeben → **Teilen-Symbol** → **Zum Home-Bildschirm**.
+Ab jetzt startest du die Kartei nur noch über das Symbol auf dem Home-Bildschirm.
+Das ist wichtig: Nur so läuft sie **offline** – und nur so behält iOS deine Karten
+dauerhaft. In einem normalen Safari-Tab löscht iOS die Daten nach sieben Tagen.
 
-Erst danach ist es eine echte App: eigenes Symbol, Vollbild, **offline nutzbar**, und
-iOS löscht die Daten nicht nach sieben Tagen (das passiert nur bei normalen Safari-Tabs).
+> Das Symbol danach **nicht** löschen – damit wären auch die Karten weg.
+
+---
+
+## Auf dem MacBook einrichten
+
+Dieselbe Adresse in **Chrome** öffnen, dann oben rechts **⋮** →
+*Streamen, Speichern und Teilen* → **Verknüpfung erstellen…** →
+Haken bei *Als Fenster öffnen* → **Erstellen**.
+
+Die Jura-Kartei liegt danach als eigene App im Dock, ohne Browser-Leiste,
+und funktioniert auch ohne Internet.
+
+### Ohne Internet und ohne GitHub arbeiten
+
+Es geht auch ganz ohne Adresse: Doppelklick auf **`Start.command`** in diesem Ordner
+startet die App unter `http://localhost:7345/`.
+
+> **Achtung – getrennte Karteien.** Die lokale Variante und die Internet-Adresse
+> haben **getrennte Datenspeicher**. Eine Karte, die du unter `localhost` anlegst,
+> erscheint nicht unter der github.io-Adresse und umgekehrt.
+> **Entscheide dich für einen Weg und bleib dabei** – am besten die Internet-Adresse,
+> weil die auf beiden Geräten funktioniert.
 
 ---
 
@@ -130,7 +145,9 @@ unangetastet. **Ersetzen** wirft den Stand auf Gerät B weg. Im Zweifel: Zusamme
 
 ```
 Jura-Kartei/
-├── Start.command     ← Doppelklick zum Starten (Mac)
+├── Start.command     ← Doppelklick: lokal starten (ohne Internet)
+├── docs/             ← diese Dateien veröffentlicht GitHub Pages
+├── build.js          ← kopiert Änderungen nach docs/
 ├── index.html        ← die App
 ├── app.js            ← Logik
 ├── styles.css        ← Gestaltung
@@ -143,3 +160,19 @@ Jura-Kartei/
 
 Die **Karten selbst stehen in keiner dieser Dateien** – sie liegen in der
 IndexedDB des Browsers bzw. der iPhone-App. Dieser Ordner ist nur das Programm.
+
+---
+
+## Änderungen an der App veröffentlichen
+
+Wenn an `index.html`, `app.js` oder `styles.css` etwas geändert wird:
+
+```
+cd ~/Jura-Kartei
+node build.js
+git add -A && git commit -m "Was geändert wurde" && git push
+```
+
+Nach ein bis zwei Minuten ist die neue Fassung unter der Adresse da. Auf dem iPhone
+die App einmal schließen und neu öffnen. **Deine Karten bleiben dabei unberührt** –
+Updates betreffen nur das Programm.
