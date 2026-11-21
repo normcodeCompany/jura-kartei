@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jura-Kartei</title>
+<meta name="description" content="Private Ablage für juristische Definitionen und Prüfungsschemata mit Karteikartenfunktion.">
+<meta name="theme-color" content="#101828" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f5f1" media="(prefers-color-scheme: light)">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jura-Kartei">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="app">
+
+  <aside id="sidebar" aria-label="Ordner">
+    <div class="side-head">
+      <div class="brand">Jura&#8209;Kartei</div>
+      <button class="icon-btn" id="btn-new-folder" title="Neuer Ordner (oberste Ebene)" aria-label="Neuer Ordner">+</button>
+    </div>
+    <div class="side-search">
+      <input id="search" type="search" placeholder="Suchen …" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <nav id="tree" class="tree"></nav>
+    <div class="side-foot">
+      <button class="ghost-btn" id="btn-settings">Einstellungen &amp; Backup</button>
+      <div class="stat" id="side-stat"></div>
+    </div>
+  </aside>
+
+  <div id="scrim" hidden></div>
+
+  <main id="main">
+    <header id="mainbar">
+      <button class="icon-btn only-mobile" id="btn-menu" aria-label="Ordner anzeigen">&#9776;</button>
+      <div class="crumb" id="crumb">Alle Karten</div>
+      <div class="bar-actions">
+        <button class="btn" id="btn-study">Lernen</button>
+        <button class="btn primary" id="btn-new-card">Neue Karte</button>
+      </div>
+    </header>
+    <div id="due-strip" hidden></div>
+    <div id="list" class="list"></div>
+  </main>
+
+</div>
+
+<div id="overlay" hidden></div>
+<div id="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
