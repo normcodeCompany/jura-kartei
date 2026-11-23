@@ -28,11 +28,13 @@ function toast(text, ms = 2200) {
 /* Markdown-light: **fett**, *kursiv*, - Listen, Absätze */
 function inlineFmt(s) {
   return esc(s)
+    .replace(/\{\{(.+?)\}\}/g, '$1')
     .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
 }
 /* Markdown-Zeichen für Vorschautexte entfernen */
 const klartext = s => String(s || '')
+  .replace(/\{\{(.+?)\}\}/g, '$1')
   .replace(/\*\*/g, '').replace(/\*/g, '')
   .replace(/^[-•]\s+/gm, '').replace(/\s*\n+\s*/g, ' · ').trim();
 
@@ -53,22 +55,14 @@ function fmt(text) {
   return out;
 }
 
-/* Gliederungs-Nummerierung: I. → 1. → a) → aa) */
-const ROM = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX'];
-function gliederung(level, i) {
-  if (level === 0) return (ROM[i] || String(i + 1)) + '.';
-  if (level === 1) return (i + 1) + '.';
-  const b = String.fromCharCode(97 + (i % 26));
-  return level === 2 ? b + ')' : b + b + ')';
-}
-
-/* Prüfungspunkte: Einrückung (Tab oder 2 Leerzeichen) = Ebene */
+/* Prüfungspunkte: Einrückung (Tab oder 2 Leerzeichen) = Ebene.
+   Der Text bleibt unverändert – die Nummerierung schreibst du selbst. */
 function parsePunkte(text) {
   return String(text || '').split('\n').map(z => {
     const m = z.match(/^([\t ]*)(.*)$/);
     const einzug = m[1].replace(/\t/g, '  ');
     const level = Math.min(3, Math.floor(einzug.length / 2));
-    const t = m[2].replace(/^[-*•]\s*/, '').replace(/^(?:[IVX]+\.|\d+\.|[a-z]{1,2}\))\s*/, '').trim();
+    const t = m[2].trim();
     return t ? { level, text: t } : null;
   }).filter(Boolean);
 }
@@ -76,15 +70,120 @@ const punkteText = p => (p || []).map(x => '  '.repeat(x.level) + x.text).join('
 
 function renderPunkte(punkte) {
   if (!punkte || !punkte.length) return '<p style="color:var(--ink-3)">Noch keine Prüfungspunkte.</p>';
-  const zaehler = [0, 0, 0, 0];
-  let out = '<ul class="schema-list">';
-  for (const p of punkte) {
-    const nr = gliederung(p.level, zaehler[p.level]);
-    zaehler[p.level]++;
-    for (let i = p.level + 1; i < 4; i++) zaehler[i] = 0;
-    out += `<li class="lvl${p.level}"><span class="num">${nr}</span><span>${inlineFmt(p.text)}</span></li>`;
+  return '<ul class="schema-list">'
+    + punkte.map(p => `<li class="lvl${p.level}">${inlineFmt(p.text)}</li>`).join('')
+    + '</ul>';
+}
+
+/* ---------- Lückentext ----------
+   Entweder du setzt Lücken selbst mit {{doppelten Klammern}},
+   oder die App wählt Schlüsselwörter automatisch – pro Karte immer dieselben. */
+const STOPPWORTE = new Set(('der die das den dem des ein eine einer eines einem einen und oder nicht '
+  + 'ist sind sein war wird werden auf für mit von vom zur zum bei durch über unter nach aus als auch '
+  + 'dass wenn sich ihre seine sowie bzw zwischen gegen ohne dieser diese dieses jeder jede jedes nur '
+  + 'noch schon dann also aber sondern damit dadurch wegen kann muss soll').split(' '));
+
+function hashCode(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+const normWort = s => String(s || '').toLowerCase().replace(/[^a-zäöüß0-9]/g, '');
+
+function luecke(wort) {
+  const breite = Math.max(5, Math.min(26, wort.length + 1));
+  return `<input class="cloze" type="text" autocapitalize="off" autocorrect="off" spellcheck="false"`
+    + ` aria-label="Lücke" data-loesung="${esc(wort)}" style="width:${breite}ch">`;
+}
+
+const CLOZE_TRENNER = /([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß-]*)/;
+const istKandidat = w => w.length >= 5 && !STOPPWORTE.has(w.toLowerCase());
+
+/* Wählt die Lücken für eine ganze Karte aus – nicht pro Zeile, sonst
+   ersäuft ein langes Schema in Lücken. Die Auswahl bleibt pro Karte gleich. */
+function clozeAufbau(zeilen, kartenId) {
+  const zerlegt = zeilen.map((z, zi) => {
+    const roh = String(z.text || '').replace(/\*\*/g, '').replace(/\*/g, '');
+    return { zi, roh, level: z.level || 0, explizit: /\{\{.+?\}\}/.test(roh), teile: roh.split(CLOZE_TRENNER) };
+  });
+
+  const explizitModus = zerlegt.some(z => z.explizit);
+  const gewaehlt = new Set();
+
+  if (!explizitModus) {
+    const kandidaten = [];
+    for (const z of zerlegt)
+      for (let i = 1; i < z.teile.length; i += 2)
+        if (istKandidat(z.teile[i]))
+          kandidaten.push({ key: z.zi + ':' + i });
+    const budget = Math.max(3, Math.min(10, Math.round(kandidaten.length * 0.25)));
+    /* Gleichmäßig über die Karte verteilen statt zufällig häufeln.
+       Der Startversatz hängt an der Karten-Kennung – pro Karte stabil, aber nicht überall gleich. */
+    const schritt = Math.max(1, Math.floor(kandidaten.length / budget));
+    const start = kandidaten.length ? hashCode(kartenId) % schritt : 0;
+    const nachbar = key => {
+      const [zi, i] = key.split(':').map(Number);
+      return gewaehlt.has(zi + ':' + (i - 2)) || gewaehlt.has(zi + ':' + (i + 2));
+    };
+    for (let k = start; k < kandidaten.length && gewaehlt.size < budget; k += schritt) {
+      const key = kandidaten[k].key;
+      if (!nachbar(key)) gewaehlt.add(key);
+    }
+    /* Auffüllen, falls die Nachbarschaftsregel Plätze gekostet hat */
+    for (const k of kandidaten) {
+      if (gewaehlt.size >= budget) break;
+      if (!gewaehlt.has(k.key) && !nachbar(k.key)) gewaehlt.add(k.key);
+    }
   }
-  return out + '</ul>';
+
+  return zerlegt.map(z => ({ level: z.level, html: clozeZeile(z, gewaehlt, explizitModus) }));
+}
+
+function clozeZeile(z, gewaehlt, explizitModus) {
+  if (explizitModus) {
+    if (!z.explizit) return esc(z.roh);
+    let out = '', last = 0, m;
+    const re = /\{\{(.+?)\}\}/g;
+    while ((m = re.exec(z.roh))) {
+      out += esc(z.roh.slice(last, m.index)) + luecke(m[1].trim());
+      last = m.index + m[0].length;
+    }
+    return out + esc(z.roh.slice(last));
+  }
+  let out = '';
+  for (let i = 0; i < z.teile.length; i++)
+    out += (i % 2 === 1 && gewaehlt.has(z.zi + ':' + i)) ? luecke(z.teile[i]) : esc(z.teile[i]);
+  return out;
+}
+
+function clozeHtml(c) {
+  const f = c.fields || {};
+  if (c.type === 'schema') {
+    const zeilen = (f.points || []).map(p => ({ text: p.text, level: p.level }));
+    if (!zeilen.length) return '<p style="color:var(--ink-3)">Diese Karte hat keine Prüfungspunkte.</p>';
+    return '<ul class="schema-list">'
+      + clozeAufbau(zeilen, c.id).map(z => `<li class="lvl${z.level}">${z.html}</li>`).join('')
+      + '</ul>';
+  }
+  const zeilen = String(f.text || '').split('\n').filter(z => z.trim()).map(t => ({ text: t }));
+  if (!zeilen.length) return '<p style="color:var(--ink-3)">Diese Karte hat keine Rückseite.</p>';
+  return clozeAufbau(zeilen, c.id).map(z => `<p>${z.html}</p>`).join('');
+}
+
+function clozePruefen(wurzel) {
+  let richtig = 0, gesamt = 0;
+  for (const inp of $$('input.cloze', wurzel)) {
+    gesamt++;
+    const soll = inp.dataset.loesung || '';
+    const ist = inp.value.trim();
+    const ok = normWort(ist) !== '' && normWort(ist) === normWort(soll);
+    if (ok) richtig++;
+    const span = document.createElement('span');
+    span.className = 'gap ' + (ok ? 'ok' : 'falsch');
+    span.innerHTML = ok ? esc(soll) : (ist ? '<s>' + esc(ist) + '</s> ' : '') + esc(soll);
+    inp.replaceWith(span);
+  }
+  return { richtig, gesamt };
 }
 
 /* ============================================================
@@ -112,7 +211,7 @@ const leererStand = () => ({
   version: 1,
   folders: [],
   cards: [],
-  settings: { theme: 'auto', lastFolder: null, lastExport: null, changesSinceExport: 0 },
+  settings: { theme: 'auto', lastFolder: null, lastExport: null, changesSinceExport: 0, answerMode: 'umdrehen' },
 });
 
 let S = leererStand();
@@ -638,14 +737,14 @@ function karteBearbeiten(id) {
     if (typ === 'definition') {
       html += feld('Begriff', `<input id="ed-title" value="${esc(entwurf.title)}" placeholder="z. B. Willenserklärung">`);
       html += feld('Definition', `<textarea id="ed-text" rows="6" placeholder="Eine Willenserklärung ist …">${esc(f.text || '')}</textarea>`,
-        '**fett**, *kursiv* und Listen mit „- “ werden formatiert.');
+        '**fett**, *kursiv* und Listen mit „- “ werden formatiert. Wörter in {{doppelten Klammern}} werden im Lückentext abgefragt.');
       html += feld('Fundstelle', `<input id="ed-source" value="${esc(f.source || '')}" placeholder="z. B. § 133 BGB">`);
       html += feld('Streitstand / Hinweis', `<textarea id="ed-note" rows="3" placeholder="h. M.: … · a. A.: …">${esc(f.note || '')}</textarea>`);
     } else if (typ === 'schema') {
       html += feld('Bezeichnung', `<input id="ed-title" value="${esc(entwurf.title)}" placeholder="z. B. Anspruch aus § 823 I BGB">`);
       html += feld('Fundstelle', `<input id="ed-source" value="${esc(f.source || '')}" placeholder="z. B. § 823 Abs. 1 BGB">`);
-      html += feld('Prüfungspunkte', `<textarea id="ed-points" rows="12" spellcheck="false" placeholder="Rechtsgutsverletzung&#10;&#9;Leben, Körper, Gesundheit&#10;Handlung&#10;Haftungsbegründende Kausalität">${esc(punkteText(f.points))}</textarea>`,
-        'Eine Zeile pro Punkt. Mit <span class="kbd">Tab</span> einrücken = Unterpunkt (bis 4 Ebenen). Die Nummerierung I. → 1. → a) → aa) macht die App.');
+      html += feld('Prüfungspunkte', `<textarea id="ed-points" rows="12" spellcheck="false" placeholder="I. Rechtsgutsverletzung&#10;&#9;1. Leben, Körper, Gesundheit&#10;II. Verletzungshandlung&#10;III. Haftungsbegründende Kausalität">${esc(punkteText(f.points))}</textarea>`,
+        'Eine Zeile pro Punkt, Nummerierung schreibst du selbst. Mit <span class="kbd">Tab</span> einrücken = Unterpunkt (bis 4 Ebenen).');
       html += feld('Hinweis', `<textarea id="ed-note" rows="3" placeholder="Klausurtipp, Streitstand, Abgrenzung …">${esc(f.note || '')}</textarea>`);
     } else {
       html += feld('Vorderseite (Frage)', `<textarea id="ed-title" rows="2" placeholder="Was wird gefragt?">${esc(entwurf.title)}</textarea>`);
@@ -794,9 +893,16 @@ function starteLernen(opt) {
     [karten[i], karten[j]] = [karten[j], karten[i]];
   }
 
-  L = { mode: opt.mode, queue: karten.map(c => c.id), idx: 0, gesamt: karten.length, erledigt: 0, auf: false };
+  L = { mode: opt.mode, queue: karten.map(c => c.id), idx: 0, gesamt: karten.length,
+        erledigt: 0, auf: false, eingabe: '', ergebnis: null, antwortHtml: null };
   lernAnsicht();
 }
+
+const ANTWORT_MODI = [
+  ['umdrehen',  'Umdrehen',  'Antwort im Kopf, dann aufdecken'],
+  ['eintippen', 'Eintippen', 'Antwort selbst formulieren'],
+  ['luecken',   'Lücken',    'Schlüsselwörter ergänzen'],
+];
 
 function lernAnsicht() {
   const id = L.queue[L.idx];
@@ -808,6 +914,7 @@ function lernAnsicht() {
     : Math.round(100 * (L.idx + 1) / L.queue.length);
   const zaehler = L.mode === 'srs'
     ? `${L.queue.length} offen` : `${L.idx + 1} / ${L.queue.length}`;
+  const modus = () => S.settings.answerMode || 'umdrehen';
 
   const s = sheet({
     raw: true,
@@ -817,6 +924,9 @@ function lernAnsicht() {
         <div class="progress"><i style="width:${fortschritt}%"></i></div>
         <div class="study-count">${zaehler}</div>
       </div>
+      <div class="study-modes" id="st-modes">${ANTWORT_MODI.map(([k, n, t]) =>
+        `<button type="button" data-m="${k}" title="${t}"${modus() === k ? ' class="on"' : ''}>${n}</button>`
+      ).join('')}</div>
       <div class="study-body"><div class="flashcard" id="st-card"></div></div>
       <div class="study-foot" id="st-foot"></div>
     </div>`,
@@ -826,52 +936,107 @@ function lernAnsicht() {
   const fuss = $('#st-foot');
   $('#st-close').onclick = () => { L = null; schliessen(); renderTree(); renderListe(); };
 
+  /* Abfrageart jederzeit umschaltbar – auch mitten in der Karte */
+  $$('#st-modes button').forEach(b => b.onclick = () => {
+    S.settings.answerMode = b.dataset.m; save();
+    $$('#st-modes button').forEach(x => x.classList.toggle('on', x === b));
+    zuruecksetzen(); zeichne();
+  });
+
+  function zuruecksetzen() { L.auf = false; L.eingabe = ''; L.ergebnis = null; L.antwortHtml = null; }
+
+  const vorderseite = () => `<div class="flash-front">${esc(c.title)}
+    <div class="sub">${TYPEN[c.type].name}${c.type === 'schema' ? ' – Aufbau nennen' : ''}${
+      (c.fields || {}).source && c.type !== 'definition' ? ' · ' + esc(c.fields.source) : ''}</div></div>`;
+
+  const rahmen = inner => vorderseite() + '<hr class="flash-sep"><div id="st-answer">' + inner + '</div>';
+
+  function fussKnopf(text, sub, fn, cls) {
+    const b = document.createElement('button');
+    b.className = 'btn ' + (cls || 'primary');
+    b.innerHTML = `<span class="grade"><b>${text}</b><small>${sub}</small></span>`;
+    b.onclick = fn;
+    fuss.appendChild(b);
+    return b;
+  }
+
   function zeichne() {
-    if (!L.auf) {
-      kartenBox.innerHTML = `<div class="flash-front">${esc(c.title)}
-        <div class="sub">${TYPEN[c.type].name}${c.type === 'schema' ? ' – Aufbau nennen' : ''}
-        ${(c.fields || {}).source && c.type !== 'definition' ? ' · ' + esc(c.fields.source) : ''}</div></div>`;
-      fuss.innerHTML = '';
-      const b = document.createElement('button');
-      b.className = 'btn primary';
-      b.innerHTML = '<span class="grade"><b>Aufdecken</b><small>Leertaste</small></span>';
-      b.onclick = aufdecken;
-      fuss.appendChild(b);
+    fuss.innerHTML = '';
+    if (!L.auf) frageZeigen();
+    else { loesungZeigen(); bewertungsKnoepfe(); }
+  }
+
+  function frageZeigen() {
+    const m = modus();
+    if (m === 'eintippen') {
+      kartenBox.innerHTML = rahmen('<div class="block-label">Deine Antwort</div>'
+        + '<textarea id="st-input" rows="6" placeholder="Aus dem Kopf formulieren …"></textarea>');
+      const n = $('#st-input');
+      n.value = L.eingabe || '';
+      setTimeout(() => n.focus(), 60);
+      fussKnopf('Prüfen', '⌘ + ↩', () => { L.eingabe = n.value; L.auf = true; zeichne(); });
+    } else if (m === 'luecken') {
+      kartenBox.innerHTML = rahmen('<div class="block-label">Lücken füllen</div>' + clozeHtml(c));
+      const erste = $('input.cloze', kartenBox);
+      if (erste) setTimeout(() => erste.focus(), 60);
+      fussKnopf('Prüfen', '⌘ + ↩', () => {
+        L.ergebnis = clozePruefen(kartenBox);
+        L.antwortHtml = $('#st-answer').innerHTML;
+        L.auf = true; zeichne();
+      });
     } else {
-      kartenBox.innerHTML = `<div class="flash-front">${esc(c.title)}</div><hr class="flash-sep">`
-        + kartenHtml(c, { nurRueck: true });
-      fuss.innerHTML = '';
-      if (L.mode === 'srs') {
-        const noten = [
-          [1, 'Nochmal', 'gleich wieder'],
-          [2, 'Schwer', vorschau(c, 2)],
-          [3, 'Gut', vorschau(c, 3)],
-          [4, 'Einfach', vorschau(c, 4)],
-        ];
-        for (const [n, titel, sub] of noten) {
-          const b = document.createElement('button');
-          b.className = 'btn g' + n;
-          b.innerHTML = `<span class="grade"><b>${titel}</b><small>${sub}</small></span>`;
-          b.onclick = () => note(n);
-          fuss.appendChild(b);
-        }
-      } else {
-        const zur = document.createElement('button');
-        zur.className = 'btn'; zur.textContent = '← Zurück';
-        zur.disabled = L.idx === 0;
-        zur.onclick = () => { L.idx = Math.max(0, L.idx - 1); L.auf = false; lernAnsicht(); };
-        const bearb = document.createElement('button');
-        bearb.className = 'btn'; bearb.textContent = 'Bearbeiten';
-        bearb.onclick = () => { const cid = c.id; L = null; schliessen(); karteBearbeiten(cid); };
-        const weiter = document.createElement('button');
-        weiter.className = 'btn primary'; weiter.textContent = 'Weiter →';
-        weiter.onclick = () => {
-          if (L.idx + 1 >= L.queue.length) return lernFertig();
-          L.idx++; L.auf = false; lernAnsicht();
-        };
-        fuss.appendChild(zur); fuss.appendChild(bearb); fuss.appendChild(weiter);
-      }
+      kartenBox.innerHTML = vorderseite();
+      fussKnopf('Aufdecken', 'Leertaste', () => { L.auf = true; zeichne(); });
     }
+  }
+
+  function loesungZeigen() {
+    const m = modus();
+    if (m === 'luecken' && L.antwortHtml) {
+      const r = L.ergebnis || { richtig: 0, gesamt: 0 };
+      const voll = r.gesamt && r.richtig === r.gesamt;
+      kartenBox.innerHTML = rahmen(
+        `<div class="treffer${voll ? ' voll' : ''}">${r.richtig} von ${r.gesamt} richtig</div>`
+        + L.antwortHtml.replace('<div class="block-label">Lücken füllen</div>', ''));
+    } else if (m === 'eintippen') {
+      const eigen = (L.eingabe || '').trim();
+      kartenBox.innerHTML = rahmen(
+        '<div class="block-label">Deine Antwort</div>'
+        + '<div class="note">' + (eigen ? fmt(eigen) : '<em>nichts eingetragen</em>') + '</div>'
+        + '<div style="height:1.2rem"></div>'
+        + kartenHtml(c, { nurRueck: true }));
+    } else {
+      kartenBox.innerHTML = rahmen(kartenHtml(c, { nurRueck: true }));
+    }
+  }
+
+  function bewertungsKnoepfe() {
+    if (L.mode === 'srs') {
+      const noten = [
+        [1, 'Nochmal', 'gleich wieder'],
+        [2, 'Schwer', vorschau(c, 2)],
+        [3, 'Gut', vorschau(c, 3)],
+        [4, 'Einfach', vorschau(c, 4)],
+      ];
+      for (const [n, titel, sub] of noten) fussKnopf(titel, sub, () => note(n), 'g' + n);
+    } else {
+      const zur = document.createElement('button');
+      zur.className = 'btn'; zur.textContent = '← Zurück';
+      zur.disabled = L.idx === 0;
+      zur.onclick = () => { L.idx = Math.max(0, L.idx - 1); zuruecksetzen(); lernAnsicht(); };
+      const bearb = document.createElement('button');
+      bearb.className = 'btn'; bearb.textContent = 'Bearbeiten';
+      bearb.onclick = () => { const cid = c.id; L = null; schliessen(); karteBearbeiten(cid); };
+      const weiter = document.createElement('button');
+      weiter.className = 'btn primary'; weiter.textContent = 'Weiter →';
+      weiter.onclick = weiterBlaettern;
+      fuss.appendChild(zur); fuss.appendChild(bearb); fuss.appendChild(weiter);
+    }
+  }
+
+  function weiterBlaettern() {
+    if (L.idx + 1 >= L.queue.length) return lernFertig();
+    L.idx++; zuruecksetzen(); lernAnsicht();
   }
 
   function vorschau(card, n) {
@@ -883,21 +1048,18 @@ function lernAnsicht() {
     return tage === 1 ? 'morgen' : tage < 30 ? tage + ' Tage' : Math.round(tage / 30) + ' Mon.';
   }
 
-  function aufdecken() { L.auf = true; zeichne(); }
-
   function note(n) {
     bewerten(c, n);
     if (n === 1) {
       L.queue.splice(L.idx, 1);
-      const ziel = Math.min(L.queue.length, L.idx + 3);
-      L.queue.splice(ziel, 0, c.id);
+      L.queue.splice(Math.min(L.queue.length, L.idx + 3), 0, c.id);
       if (L.idx >= L.queue.length) L.idx = 0;
     } else {
       L.queue.splice(L.idx, 1);
       L.erledigt++;
       if (L.idx >= L.queue.length) L.idx = 0;
     }
-    L.auf = false;
+    zuruecksetzen();
     if (!L.queue.length) return lernFertig();
     lernAnsicht();
   }
@@ -906,10 +1068,24 @@ function lernAnsicht() {
   document.addEventListener('keydown', tasten);
   function tasten(e) {
     if (!L) return;
-    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (!L.auf) aufdecken(); else if (L.mode === 'browse') $('#st-foot').lastChild.click(); }
-    else if (L.auf && L.mode === 'srs' && ['1', '2', '3', '4'].includes(e.key)) { e.preventDefault(); note(Number(e.key)); }
-    else if (L.mode === 'browse' && e.key === 'ArrowRight') { e.preventDefault(); if (L.idx + 1 < L.queue.length) { L.idx++; L.auf = false; lernAnsicht(); } }
-    else if (L.mode === 'browse' && e.key === 'ArrowLeft') { e.preventDefault(); if (L.idx > 0) { L.idx--; L.auf = false; lernAnsicht(); } }
+    const tippt = /^(INPUT|TEXTAREA)$/.test(e.target.tagName || '');
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (!L.auf) { const b = $('#st-foot .btn'); if (b) b.click(); }
+      return;
+    }
+    if (tippt) return;
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      if (!L.auf) { const b = $('#st-foot .btn'); if (b) b.click(); }
+      else if (L.mode === 'browse') weiterBlaettern();
+    } else if (L.auf && L.mode === 'srs' && ['1', '2', '3', '4'].includes(e.key)) {
+      e.preventDefault(); note(Number(e.key));
+    } else if (L.mode === 'browse' && e.key === 'ArrowRight') {
+      e.preventDefault(); if (L.idx + 1 < L.queue.length) weiterBlaettern();
+    } else if (L.mode === 'browse' && e.key === 'ArrowLeft') {
+      e.preventDefault(); if (L.idx > 0) { L.idx--; zuruecksetzen(); lernAnsicht(); }
+    }
   }
   lernAnsicht._cleanup = () => document.removeEventListener('keydown', tasten);
   if (lernAnsicht._prev) lernAnsicht._prev();
@@ -978,7 +1154,7 @@ function einstellungen() {
 
       <div class="settings-sec">
         <h3>Tastatur (Mac)</h3>
-        <p><span class="kbd">Leertaste</span> aufdecken · <span class="kbd">1</span>–<span class="kbd">4</span> bewerten ·
+        <p><span class="kbd">Leertaste</span> aufdecken · <span class="kbd">⌘</span>+<span class="kbd">↩</span> prüfen · <span class="kbd">1</span>–<span class="kbd">4</span> bewerten ·
            <span class="kbd">←</span> <span class="kbd">→</span> blättern · <span class="kbd">N</span> neue Karte ·
            <span class="kbd">⌘</span>+<span class="kbd">↩</span> speichern · <span class="kbd">Esc</span> schließen</p>
       </div>
@@ -1129,13 +1305,13 @@ function beispiele() {
   card(delikt, 'schema', 'Anspruch aus § 823 Abs. 1 BGB', {
     source: '§ 823 Abs. 1 BGB',
     points: parsePunkte(
-      'Rechtsgutsverletzung\n\tLeben, Körper, Gesundheit, Freiheit, Eigentum\n\tSonstiges Recht\n\t\tRecht am eingerichteten und ausgeübten Gewerbebetrieb\n\t\tAllgemeines Persönlichkeitsrecht\n' +
-      'Verletzungshandlung\n\tTun oder pflichtwidriges Unterlassen\n' +
-      'Haftungsbegründende Kausalität\n\tÄquivalenz\n\tAdäquanz\n\tSchutzzweck der Norm\n' +
-      'Rechtswidrigkeit\n\tIndiziert bei unmittelbarer Verletzung\n\tRechtfertigungsgründe\n' +
-      'Verschulden\n\tVorsatz oder Fahrlässigkeit, § 276 BGB\n\tVerschuldensfähigkeit, §§ 827, 828 BGB\n' +
-      'Schaden und haftungsausfüllende Kausalität\n\t§§ 249 ff. BGB\n\tMitverschulden, § 254 BGB'),
-    note: 'Beispielkarte – zeigt, wie Einrückung zu I. / 1. / a) wird. Kannst du löschen oder überschreiben.',
+      'I. Rechtsgutsverletzung\n\t1. Leben, Körper, Gesundheit, Freiheit, Eigentum\n\t2. Sonstiges Recht\n\t\ta) Recht am eingerichteten und ausgeübten Gewerbebetrieb\n\t\tb) Allgemeines Persönlichkeitsrecht\n' +
+      'II. Verletzungshandlung\n\t1. Tun oder pflichtwidriges Unterlassen\n' +
+      'III. Haftungsbegründende Kausalität\n\t1. Äquivalenz\n\t2. Adäquanz\n\t3. Schutzzweck der Norm\n' +
+      'IV. Rechtswidrigkeit\n\t1. Indiziert bei unmittelbarer Verletzung\n\t2. Rechtfertigungsgründe\n' +
+      'V. Verschulden\n\t1. Vorsatz oder Fahrlässigkeit, § 276 BGB\n\t2. Verschuldensfähigkeit, §§ 827, 828 BGB\n' +
+      'VI. Schaden und haftungsausfüllende Kausalität\n\t1. §§ 249 ff. BGB\n\t2. Mitverschulden, § 254 BGB'),
+    note: 'Beispielkarte – die Nummerierung ist selbst getippt, die Einrückung macht nur den Versatz. Kannst du löschen oder überschreiben.',
   }, ['Deliktsrecht', 'Schema']);
 
   card(bgbAt, 'frei', 'Worin unterscheidet sich die Anfechtung nach § 119 I BGB von der nach § 119 II BGB?', {

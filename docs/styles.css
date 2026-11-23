@@ -227,22 +227,23 @@ select{-webkit-appearance:none;appearance:none;background-image:none}
 .cardview .src{font-family:var(--sans);font-size:.8rem;color:var(--ink-3);margin-bottom:1.1rem}
 .cardview p{margin:0 0 .75rem}
 .cardview .block{margin-bottom:1.3rem}
+.block-label,
 .cardview .block-label{
   font-family:var(--sans);font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;
   color:var(--ink-3);font-weight:700;margin-bottom:.3rem;
 }
 .cardview .quote{border-left:3px solid var(--accent);padding-left:.85rem}
+.note,
 .cardview .note{
   font-family:var(--sans);font-size:.92rem;background:var(--bg-3);
   border-radius:var(--radius-s);padding:.7rem .85rem;color:var(--ink-2);
 }
 .schema-list{list-style:none;padding:0;margin:0}
-.schema-list li{display:flex;gap:.5rem;margin:.18rem 0}
-.schema-list .num{flex:0 0 auto;color:var(--accent);font-weight:700;min-width:1.9rem}
+.schema-list li{display:block;margin:.3rem 0}
 .schema-list li.lvl1{margin-left:1.5rem}
 .schema-list li.lvl2{margin-left:3rem}
 .schema-list li.lvl3{margin-left:4.5rem}
-.schema-list li.lvl0{margin-top:.6rem;font-weight:600}
+.schema-list li.lvl0{margin-top:.7rem}
 .schema-list li.lvl0:first-child{margin-top:0}
 
 /* ---------- Lernen ---------- */
@@ -313,4 +314,41 @@ select{-webkit-appearance:none;appearance:none;background-image:none}
   .schema-list li.lvl1{margin-left:1rem}
   .schema-list li.lvl2{margin-left:2rem}
   .schema-list li.lvl3{margin-left:3rem}
+}
+
+/* ---------- Abfragearten beim Lernen ---------- */
+.study-modes{
+  display:flex;gap:.3rem;padding:.5rem 1rem;
+  border-bottom:1px solid var(--line);background:var(--bg);
+}
+.study-modes button{
+  flex:1;background:var(--bg-2);border:1px solid var(--line-2);color:var(--ink-2);
+  border-radius:var(--radius-s);padding:.34rem .3rem;font-size:.82rem;cursor:pointer;
+}
+.study-modes button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--ink);font-weight:600}
+
+input.cloze{
+  display:inline;padding:.02rem .3rem;margin:0 .12rem;
+  border:0;border-bottom:2px solid var(--accent);border-radius:3px 3px 0 0;
+  background:var(--bg-3);font-family:inherit;font-size:inherit;line-height:inherit;
+  vertical-align:baseline;min-width:3ch;
+}
+input.cloze:focus{outline:none;background:var(--accent-soft)}
+.gap{padding:0 .22rem;border-radius:4px;font-weight:600}
+.gap.ok{background:rgba(47,107,79,.18);color:var(--ok)}
+.gap.falsch{background:rgba(179,38,30,.14)}
+.gap.falsch s{opacity:.6;font-weight:400;margin-right:.25rem}
+.treffer{
+  font-family:var(--sans);font-size:.85rem;font-weight:700;
+  color:var(--ink-2);margin-bottom:1rem;
+}
+.treffer.voll{color:var(--ok)}
+#st-answer{font-family:var(--serif);font-size:1.05rem;line-height:1.75}
+#st-answer textarea{font-family:var(--sans);font-size:.95rem;line-height:1.5}
+#st-answer > p{margin:0 0 .7rem}
+#st-answer .cardview{font-size:1rem}
+
+@media (max-width:760px){
+  .study-modes{padding:.45rem .6rem}
+  .study-modes button{font-size:.78rem;padding:.3rem .2rem}
 }

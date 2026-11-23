@@ -1,6 +1,6 @@
 /* Offline-Betrieb: App-Dateien werden lokal zwischengespeichert.
    Deine Karten liegen NICHT hier, sondern in der IndexedDB des Geräts. */
-const VERSION = 'jura-kartei-v1';
+const VERSION = 'jura-kartei-v2';
 const DATEIEN = [
   './', './index.html', './styles.css', './app.js', './manifest.webmanifest',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',

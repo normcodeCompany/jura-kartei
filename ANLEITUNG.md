@@ -63,15 +63,18 @@ startet die App unter `http://localhost:7345/`.
 
 ### Prüfungsschemata schreiben
 
-Eine Zeile pro Punkt. Mit **Tab** einrücken = Unterpunkt (bis zu vier Ebenen).
-Die Nummerierung macht die App:
+Eine Zeile pro Punkt. **Die Nummerierung schreibst du selbst** – I., 1., a), aa),
+A., (1), oder was immer du gewohnt bist. Die App rührt sie nicht an.
+
+Mit **Tab** rückst du ein; das bestimmt nur, wie weit der Punkt optisch einzieht
+(bis zu vier Stufen):
 
 ```
-Rechtsgutsverletzung                →  I.   Rechtsgutsverletzung
-→   Leben, Körper, Gesundheit       →     1. Leben, Körper, Gesundheit
-→   Sonstiges Recht                 →     2. Sonstiges Recht
-→   →   Gewerbebetrieb              →        a) Gewerbebetrieb
-Verletzungshandlung                 →  II.  Verletzungshandlung
+I. Rechtsgutsverletzung
+→   1. Leben, Körper, Gesundheit
+→   2. Sonstiges Recht
+→   →   a) Gewerbebetrieb
+II. Verletzungshandlung
 ```
 
 ### Formatierung in Textfeldern
@@ -107,9 +110,36 @@ Unter jedem Knopf steht, wann die Karte dann wiederkommt.
 **Durchblättern** – alle Karten der Reihe nach oder zufällig, ohne den Lernplan
 zu verändern. Zum Nachschlagen und Vorbereiten.
 
+### Wie du antwortest – jederzeit umschaltbar
+
+Über der Karte stehen immer drei Knöpfe. Du kannst mitten in einer Karte wechseln;
+die Wahl bleibt für die nächsten Karten erhalten.
+
+| | wie es läuft |
+|---|---|
+| **Umdrehen** | Du beantwortest im Kopf und deckst dann auf. Am schnellsten. |
+| **Eintippen** | Du formulierst die Antwort aus und vergleichst sie danach mit der Lösung. Am nächsten an der Klausur. |
+| **Lücken** | Schlüsselwörter sind ausgeblendet, du füllst sie aus. Danach steht da, wie viele du getroffen hast – richtige grün, falsche rot mit der Lösung daneben. |
+
+Bewertet wird in allen drei Fällen gleich: du entscheidest selbst, ob es „Gut" war.
+
+#### Eigene Lücken festlegen
+
+Normalerweise sucht die App die Lücken selbst aus – gleichmäßig über die Karte verteilt,
+und bei derselben Karte immer dieselben. Willst du bestimmen, was abgefragt wird, setze
+im Text **doppelte geschweifte Klammern**:
+
+```
+Besitz ist die {{tatsächliche Sachherrschaft}} über eine Sache.
+```
+
+Sobald auf einer Karte eine solche Markierung steht, fragt die App nur noch deine
+eigenen ab. In der normalen Kartenansicht sind die Klammern unsichtbar. Es geht auch
+mehr als ein Wort pro Lücke.
+
 ### Tastatur (Mac)
 
-`Leertaste` aufdecken · `1`–`4` bewerten · `←` `→` blättern ·
+`Leertaste` aufdecken · `⌘ + ↩` prüfen · `1`–`4` bewerten · `←` `→` blättern ·
 `N` neue Karte · `L` lernen · `/` suchen · `⌘ + ↩` speichern · `Esc` schließen
 
 ---
